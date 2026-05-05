@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Utensils, BarChart3, Settings, TrainFront } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Utensils, BarChart3, Settings } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { useStore } from '../store';
 
@@ -18,10 +18,12 @@ export function Sidebar() {
   return (
     <aside className="w-64 bg-black text-white h-screen fixed left-0 top-0 flex flex-col z-50">
       <div className="p-6 flex items-center gap-3 border-b border-zinc-800">
-        <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center overflow-hidden">
-          {/* Placeholder for future logo image */}
-          <TrainFront className="text-white" size={24} />
-          {/* Once you have logo.png in public: <img src="/logo.png" className="w-full h-full object-cover" /> */}
+        <div className="w-10 h-10 rounded-xl overflow-hidden bg-zinc-800">
+          <img 
+            src="/assets/logo.jpg" 
+            alt="Choo Choo Tortas" 
+            className="w-full h-full object-cover"
+          />
         </div>
         <span className="font-black text-xl tracking-tighter uppercase leading-none italic">
           Choo Choo <br />
@@ -52,8 +54,8 @@ export function Sidebar() {
 
       <div className="p-6 border-t border-zinc-800">
         <div className="flex items-center gap-3 px-2">
-          <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold">
-            AD
+          <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold overflow-hidden">
+            <img src="/assets/logo.jpg" alt="Admin" className="w-full h-full object-cover" />
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-medium">Admin User</span>

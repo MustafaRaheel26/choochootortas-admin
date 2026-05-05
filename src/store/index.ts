@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { Order, MenuCategory, SalesReport, RestaurantSettings, MenuItem } from '../types';
-import { orderService } from '../services/orderService';
-import { menuService } from '../services/menuService';
-import { reportService, settingsService } from '../services/reportService';
+import { getOrders, updateOrderStatus, OrderStatus } from '../services/orderService';
+import { getMenu, addCategory, deleteCategory, addMenuItem, updateMenuItem, deleteMenuItem, toggleItemAvailability } from '../services/menuService';
+import { getSalesReport, getSettings, updateSettings as updateSettingsAPI } from '../services/reportService';
+import { adminLogin, adminLogout, isAuthenticated, getCurrentUser } from '../services/authService';
 
 interface AppState {
   orders: Order[];
@@ -12,10 +13,11 @@ interface AppState {
   loading: boolean;
   error: string | null;
   isAuthenticated: boolean;
+  currentUser: any;
 
   fetchOrders: () => Promise<void>;
   fetchMenu: () => Promise<void>;
-  fetchReport: () => Promise<void>;
+  fetchReport: (range?: string) => Promise<void>;
   fetchSettings: () => Promise<void>;
   
   updateOrderStatus: (id: string, status: Order['status']) => Promise<void>;
@@ -26,9 +28,12 @@ interface AppState {
   updateItem: (itemId: string, updates: Partial<MenuItem>) => Promise<void>;
   deleteItem: (itemId: string) => Promise<void>;
   toggleItemAvailability: (itemId: string, available: boolean) => Promise<void>;
+  
+  updateSettings: (settings: Partial<RestaurantSettings>) => Promise<void>;
 
-  login: (password: string) => boolean;
+  login: (password: string) => Promise<boolean>;
   logout: () => void;
+  checkAuth: () => boolean;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -38,14 +43,16 @@ export const useStore = create<AppState>((set, get) => ({
   settings: null,
   loading: false,
   error: null,
-  isAuthenticated: false, // Default to false
+  isAuthenticated: isAuthenticated(),
+  currentUser: getCurrentUser(),
 
   fetchOrders: async () => {
     set({ loading: true });
     try {
-      const orders = await orderService.getOrders();
+      const orders = await getOrders();
       set({ orders, loading: false });
     } catch (err) {
+      console.error('fetchOrders error:', err);
       set({ error: 'Failed to fetch orders', loading: false });
     }
   },
@@ -53,86 +60,139 @@ export const useStore = create<AppState>((set, get) => ({
   fetchMenu: async () => {
     set({ loading: true });
     try {
-      const menu = await menuService.getMenu();
+      const menu = await getMenu();
       set({ menu, loading: false });
     } catch (err) {
+      console.error('fetchMenu error:', err);
       set({ error: 'Failed to fetch menu', loading: false });
     }
   },
 
-  fetchReport: async () => {
+  fetchReport: async (range = 'week') => {
     set({ loading: true });
     try {
-      const salesReport = await reportService.getSalesReport();
+      const salesReport = await getSalesReport(range);
       set({ salesReport, loading: false });
     } catch (err) {
+      console.error('fetchReport error:', err);
       set({ error: 'Failed to fetch sales report', loading: false });
     }
   },
 
   fetchSettings: async () => {
     try {
-      const settings = await settingsService.getSettings();
+      const settings = await getSettings();
       set({ settings });
     } catch (err) {
+      console.error('fetchSettings error:', err);
       set({ error: 'Failed to fetch settings' });
+    }
+  },
+
+  updateSettings: async (settingsData) => {
+    try {
+      console.log('📝 Updating settings:', settingsData);
+      const updatedSettings = await updateSettingsAPI(settingsData);
+      console.log('✅ Settings updated:', updatedSettings);
+      set({ settings: updatedSettings });
+    } catch (err) {
+      console.error('updateSettings error:', err);
+      throw err;
     }
   },
 
   updateOrderStatus: async (id, status) => {
     try {
-      await orderService.updateOrderStatus(id, status);
-      const orders = await orderService.getOrders();
-      set({ orders });
+      await updateOrderStatus(id, status as OrderStatus);
+      await get().fetchOrders();
     } catch (err) {
+      console.error('updateOrderStatus error:', err);
       set({ error: 'Failed to update order status' });
     }
   },
 
   addCategory: async (name) => {
-    await menuService.addCategory(name);
-    await get().fetchMenu();
+    try {
+      await addCategory(name);
+      await get().fetchMenu();
+    } catch (err) {
+      console.error('addCategory error:', err);
+      throw err;
+    }
   },
 
   deleteCategory: async (id) => {
-    await menuService.deleteCategory(id);
-    await get().fetchMenu();
+    try {
+      await deleteCategory(id);
+      await get().fetchMenu();
+    } catch (err) {
+      console.error('deleteCategory error:', err);
+      throw err;
+    }
   },
 
   addItem: async (categoryId, item) => {
-    await menuService.addItem(categoryId, item);
-    await get().fetchMenu();
+    try {
+      await addMenuItem(categoryId, item);
+      await get().fetchMenu();
+    } catch (err) {
+      console.error('addItem error:', err);
+      throw err;
+    }
   },
 
   updateItem: async (itemId, updates) => {
-    await menuService.updateItem(itemId, updates);
-    await get().fetchMenu();
+    try {
+      await updateMenuItem(itemId, updates);
+      await get().fetchMenu();
+    } catch (err) {
+      console.error('updateItem error:', err);
+      throw err;
+    }
   },
 
   deleteItem: async (itemId) => {
-    await menuService.deleteItem(itemId);
-    await get().fetchMenu();
+    try {
+      await deleteMenuItem(itemId);
+      await get().fetchMenu();
+    } catch (err) {
+      console.error('deleteItem error:', err);
+      throw err;
+    }
   },
 
   toggleItemAvailability: async (itemId, available) => {
     try {
-      await menuService.updateItemAvailability(itemId, available);
-      const menu = await menuService.getMenu();
-      set({ menu });
+      await toggleItemAvailability(itemId, available);
+      await get().fetchMenu();
     } catch (err) {
-      set({ error: 'Failed to update item availability' });
+      console.error('toggleItemAvailability error:', err);
+      throw err;
     }
   },
 
-  login: (password: string) => {
-    if (password === 'tortas2026') {
-      set({ isAuthenticated: true });
+  login: async (password: string) => {
+    try {
+      const { token, user } = await adminLogin(password);
+      set({ isAuthenticated: true, currentUser: user });
       return true;
+    } catch (err) {
+      console.error('login error:', err);
+      set({ error: 'Invalid password' });
+      return false;
     }
-    return false;
   },
 
   logout: () => {
-    set({ isAuthenticated: false });
-  }
+    adminLogout();
+    set({ isAuthenticated: false, currentUser: null });
+  },
+
+  checkAuth: () => {
+    const auth = isAuthenticated();
+    if (!auth) {
+      set({ isAuthenticated: false, currentUser: null });
+    }
+    return auth;
+  },
 }));

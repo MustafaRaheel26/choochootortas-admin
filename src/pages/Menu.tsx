@@ -34,6 +34,8 @@ export function Menu() {
   useEffect(() => {
     if (menu.length > 0 && !selectedCategoryId) {
       setSelectedCategoryId(menu[0].id);
+      // Also update formData categoryId when selected category changes
+      setFormData(prev => ({ ...prev, categoryId: menu[0].id }));
     }
   }, [menu]);
 
@@ -54,6 +56,10 @@ export function Menu() {
   };
 
   const openAddItemModal = () => {
+    if (!selectedCategoryId) {
+      alert('Please select a category first');
+      return;
+    }
     setEditingItemId(null);
     setFormData({
       itemName: '',
@@ -62,7 +68,7 @@ export function Menu() {
       ingredients: [],
       removeOptions: [],
       extras: [],
-      categoryId: selectedCategoryId || '',
+      categoryId: selectedCategoryId,
       available: true,
       isBestseller: false,
       image: ''
@@ -88,17 +94,58 @@ export function Menu() {
   };
 
   const handleSaveItem = async () => {
-    if (!formData.itemName || !formData.categoryId) {
-      alert('Item name and category are required.');
+    console.log('🔍 handleSaveItem called');
+    console.log('🔍 Current formData:', formData);
+    
+    // Validate required fields
+    if (!formData.itemName || formData.itemName.trim() === '') {
+      alert('Item name is required');
+      console.log('❌ Validation failed: itemName is empty');
+      return;
+    }
+    if (!formData.categoryId) {
+      alert('Please select a category');
+      console.log('❌ Validation failed: categoryId is missing');
+      return;
+    }
+    if (formData.price <= 0) {
+      alert('Please enter a valid price');
+      console.log('❌ Validation failed: price is invalid');
       return;
     }
 
-    if (editingItemId) {
-      await updateItem(editingItemId, formData);
-    } else {
-      await addItem(formData.categoryId, formData);
+    try {
+      console.log('✅ Validation passed, saving item...');
+      
+      // Prepare the data exactly as backend expects
+      const itemToSave = {
+        itemName: formData.itemName.trim(),
+        price: formData.price,
+        description: formData.description,
+        ingredients: formData.ingredients.filter(i => i.trim() !== ''),
+        removeOptions: formData.removeOptions,
+        extras: formData.extras.filter(e => e.name.trim() !== ''),
+        categoryId: formData.categoryId,
+        available: formData.available,
+        isBestseller: formData.isBestseller,
+        image: formData.image || '',
+      };
+      
+      console.log('📤 Sending to backend:', itemToSave);
+      
+      if (editingItemId) {
+        await updateItem(editingItemId, itemToSave);
+        alert('Item updated successfully!');
+      } else {
+        await addItem(formData.categoryId, itemToSave);
+        alert('Item added successfully!');
+      }
+      setIsItemModalOpen(false);
+      await fetchMenu();
+    } catch (error: any) {
+      console.error('❌ Failed to save item:', error);
+      alert(`Failed to save item: ${error.message || 'Please try again'}`);
     }
-    setIsItemModalOpen(false);
   };
 
   // Dynamic List Handlers
@@ -122,7 +169,7 @@ export function Menu() {
 
   const updateExtra = (index: number, field: 'name' | 'price', val: any) => {
     const nextExtras = [...formData.extras];
-    nextExtras[index] = { ...nextExtras[index], [field]: val };
+    nextExtras[index] = { ...nextExtras[index], [field]: field === 'price' ? parseFloat(val) || 0 : val };
     setFormData(prev => ({ ...prev, extras: nextExtras }));
   };
 
@@ -177,7 +224,10 @@ export function Menu() {
             {menu.map((cat) => (
               <div key={cat.id} className="group flex items-center gap-1">
                 <button
-                  onClick={() => setSelectedCategoryId(cat.id)}
+                  onClick={() => {
+                    setSelectedCategoryId(cat.id);
+                    setFormData(prev => ({ ...prev, categoryId: cat.id }));
+                  }}
                   className={cn(
                     "flex-1 flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold text-left transition-all cursor-pointer",
                     selectedCategoryId === cat.id ? "bg-red-600 text-white shadow-lg" : "text-zinc-500 hover:bg-zinc-50"
@@ -324,13 +374,16 @@ export function Menu() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="md:col-span-2 space-y-4">
                   <div>
-                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 block">Item Name</label>
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 block">Item Name *</label>
                     <input 
                       type="text" 
                       className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-5 py-4 outline-none focus:border-red-500 text-lg font-bold"
                       placeholder="e.g. Torta Hawaiiana"
                       value={formData.itemName}
-                      onChange={e => setFormData({...formData, itemName: e.target.value})}
+                      onChange={(e) => {
+                        console.log('📝 Item name changed:', e.target.value);
+                        setFormData({...formData, itemName: e.target.value});
+                      }}
                     />
                   </div>
                   <div>
@@ -346,17 +399,18 @@ export function Menu() {
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 block">Price ($)</label>
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 block">Price ($) *</label>
                     <input 
                       type="number" 
+                      step="0.01"
                       className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-5 py-4 outline-none focus:border-red-500 text-lg font-black"
                       placeholder="0.00"
                       value={formData.price}
-                      onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})}
+                      onChange={e => setFormData({...formData, price: parseFloat(e.target.value) || 0})}
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 block">Category</label>
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 block">Category *</label>
                     <select 
                       className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-5 py-4 outline-none focus:border-red-500 font-bold appearance-none cursor-pointer"
                       value={formData.categoryId}
@@ -439,10 +493,11 @@ export function Menu() {
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold">$</span>
                           <input 
                             type="number" 
+                            step="0.01"
                             className="w-full bg-zinc-50 border border-zinc-100 rounded-xl pl-6 pr-4 py-2 text-sm font-black"
                             placeholder="0.00"
                             value={ex.price}
-                            onChange={e => updateExtra(idx, 'price', parseFloat(e.target.value))}
+                            onChange={e => updateExtra(idx, 'price', parseFloat(e.target.value) || 0)}
                           />
                         </div>
                         <button onClick={() => removeExtra(idx)} className="p-2 text-zinc-300 hover:text-red-500 cursor-pointer">
@@ -542,7 +597,7 @@ export function Menu() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 block">External Image URL Alias (Optional)</label>
+                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 block">External Image URL (Optional)</label>
                   <input 
                     type="text" 
                     className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-5 py-3 outline-none focus:border-red-500 text-sm font-medium"

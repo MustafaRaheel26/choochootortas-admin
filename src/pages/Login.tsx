@@ -20,21 +20,23 @@ export function Login() {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(false);
 
-    // Simulate network delay
-    setTimeout(() => {
-      const success = login(password);
+    try {
+      const success = await login(password);
       if (success) {
         navigate('/', { replace: true });
       } else {
         setError(true);
         setIsSubmitting(false);
       }
-    }, 800);
+    } catch (err) {
+      setError(true);
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -103,7 +105,7 @@ export function Login() {
           </button>
 
           <p className="text-center text-[10px] text-zinc-600 font-bold uppercase tracking-widest">
-            Contact system admin for access credentials
+            Use password: tortas2026
           </p>
         </form>
       </motion.div>
