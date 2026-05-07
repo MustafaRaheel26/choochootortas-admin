@@ -386,6 +386,8 @@ export function Menu() {
                       }}
                     />
                   </div>
+                  {/* Description field removed per client request - data preserved in backend */}
+                  {/* 
                   <div>
                     <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 block">Description</label>
                     <textarea 
@@ -396,6 +398,7 @@ export function Menu() {
                       onChange={e => setFormData({...formData, description: e.target.value})}
                     />
                   </div>
+                  */}
                 </div>
                 <div className="space-y-4">
                   <div>
